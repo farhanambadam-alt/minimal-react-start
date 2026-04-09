@@ -34,7 +34,6 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 /* Partner (Staff & Owner) */
 const StaffLayout = lazy(() => import("./layouts/StaffLayout"));
-const StaffLayout = lazy(() => import("./layouts/StaffLayout"));
 const OwnerLayout = lazy(() => import("./layouts/OwnerLayout"));
 const OwnerDashboard = lazy(() => import("./pages/partner/OwnerDashboard"));
 const OwnerBookings = lazy(() => import("./pages/partner/OwnerBookings"));
