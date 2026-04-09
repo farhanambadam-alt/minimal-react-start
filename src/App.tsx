@@ -33,7 +33,6 @@ const AtHomeBooking = lazy(() => import("./pages/AtHomeBooking"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 /* Partner (Staff & Owner) */
-const DeviceGate = lazy(() => import("./pages/partner/DeviceGate"));
 const StaffLayout = lazy(() => import("./layouts/StaffLayout"));
 const OwnerLayout = lazy(() => import("./layouts/OwnerLayout"));
 const OwnerDashboard = lazy(() => import("./pages/partner/OwnerDashboard"));
@@ -58,8 +57,8 @@ const App = () => (
           <FlutterBridge />
           <Suspense fallback={<FullPageSpinner />}>
             <Routes>
-              {/* ── Partner: Device Gate ── */}
-              <Route path="/partner" element={<DeviceGate />} />
+              {/* ── Partner: redirect /partner to /staff ── */}
+              <Route path="/partner" element={<StaffLayout />} />
 
               {/* ── Partner: Staff (single page with internal toggle) ── */}
               <Route path="/staff" element={<StaffLayout />} />
