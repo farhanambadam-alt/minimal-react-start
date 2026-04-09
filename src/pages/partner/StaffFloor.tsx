@@ -8,7 +8,7 @@ import {
 import ActionDrawer from '@/components/partner/ActionDrawer';
 import {
   Plus, Clock, Smartphone, User, Coffee, Check, Minus,
-  AlertTriangle, X, ChevronLeft, ChevronRight, CalendarDays,
+  AlertTriangle, X,
 } from 'lucide-react';
 
 /* ── Duration Dial ── */
@@ -158,6 +158,29 @@ const StaffFloor = () => {
       return d;
     });
   }, []);
+
+  // Generate date chips for ±3 days
+  const dateChips = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const chips = [];
+    for (let i = -3; i <= 7; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      const sel = new Date(selectedDate);
+      sel.setHours(0, 0, 0, 0);
+      chips.push({
+        key: d.toISOString(),
+        date: d,
+        dayName: d.toLocaleDateString('en-IN', { weekday: 'short' }),
+        dayNum: d.getDate(),
+        month: d.toLocaleDateString('en-IN', { month: 'short' }),
+        isToday: d.getTime() === today.getTime(),
+        isSelected: d.getTime() === sel.getTime(),
+      });
+    }
+    return chips;
+  }, [selectedDate]);
 
   const barberId = activeStaff?.id ?? '';
 
