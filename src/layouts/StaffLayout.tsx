@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { usePartner } from '@/contexts/PartnerContext';
 import StaffFloor from '@/pages/partner/StaffFloor';
 import StaffProfile from '@/pages/partner/StaffProfile';
@@ -21,10 +21,12 @@ const staffTabs: PartnerTab[] = [
 const StaffLayout = () => {
   const { staff, activeStaffId, setActiveStaff } = usePartner();
   const navigate = useNavigate();
-  const [view, setView] = useState<'schedule' | 'profile'>('schedule');
+  const { pathname } = useLocation();
   const [pinModal, setPinModal] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
+
+  const isProfile = pathname === '/staff/profile';
 
   // Auto-select first staff if none selected
   if (!activeStaffId && staff.length > 0) {
