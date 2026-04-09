@@ -229,26 +229,34 @@ const OwnerBookings = () => {
           <button onClick={() => setShowDateInput(!showDateInput)} className="p-1.5 rounded-lg bg-secondary hover:bg-secondary/80 shrink-0">
             <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
-          <div ref={dateScrollRef} className="flex gap-1 overflow-x-auto flex-1 scrollbar-none py-1">
+          <div ref={dateScrollRef} className="flex gap-1 overflow-x-auto flex-1 scrollbar-none py-1 -mx-0.5 px-0.5">
             {dateRange.map(d => {
               const dateStr = d.toISOString().split('T')[0];
               const isSelected = dateStr === selectedDateStr;
               const isTodayDate = isSameDay(d, today);
+              const isSelectedAndToday = isSelected && isTodayDate;
               return (
                 <button
                   key={dateStr}
                   data-today={isTodayDate ? 'true' : undefined}
                   onClick={() => setSelectedDate(new Date(d))}
-                  className={`flex flex-col items-center px-2.5 py-1 rounded-lg shrink-0 transition-all min-w-[44px] ${
-                    isSelected
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : isTodayDate
-                        ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
-                        : 'bg-secondary/60 text-muted-foreground hover:bg-secondary'
+                  className={`relative flex flex-col items-center px-2.5 py-1.5 rounded-2xl shrink-0 transition-all min-w-[44px] ${
+                    isSelectedAndToday
+                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-2 ring-primary/30 ring-offset-1 ring-offset-card'
+                      : isSelected
+                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                        : isTodayDate
+                          ? 'bg-primary/12 text-primary ring-1.5 ring-primary/40'
+                          : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
                   }`}
                 >
-                  <span className="text-[9px] font-medium leading-tight">{getDayLabel(d, today)}</span>
-                  <span className="text-sm font-bold leading-tight">{d.getDate()}</span>
+                  <span className="text-[9px] font-semibold leading-tight tracking-wide uppercase">{getDayLabel(d, today)}</span>
+                  <span className="text-base font-bold leading-snug">{d.getDate()}</span>
+                  {isTodayDate && (
+                    <span className={`absolute -bottom-0.5 w-1.5 h-1.5 rounded-full ${
+                      isSelected ? 'bg-primary-foreground' : 'bg-primary'
+                    }`} />
+                  )}
                 </button>
               );
             })}
