@@ -250,51 +250,58 @@ const StaffFloor = () => {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Staff info + clock header */}
-      <div className="bg-card border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center text-lg">
-              {activeStaff.avatar}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">{activeStaff.name}</p>
-              <div className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${isOnBreak ? 'bg-amber-500' : activeStaff.status === 'free' ? 'bg-emerald-500' : 'bg-destructive'}`} />
-                <span className="text-[10px] text-muted-foreground font-medium">
-                  {isOnBreak ? 'ON BREAK' : activeStaff.status === 'free' ? 'AVAILABLE' : 'BUSY'}
-                </span>
-              </div>
-            </div>
+      {/* ── Date Chips + Controls Header ── */}
+      <div className="bg-card border-b border-border px-3 py-2">
+        {/* Clock + Status row */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${isOnBreak ? 'bg-amber-500' : activeStaff.status === 'free' ? 'bg-emerald-500' : 'bg-destructive'}`} />
+            <span className="text-[10px] text-muted-foreground font-medium">
+              {isOnBreak ? 'ON BREAK' : activeStaff.status === 'free' ? 'Available' : 'Busy'}
+            </span>
           </div>
           <div className="flex items-center gap-1 text-primary">
-            <Clock className="w-4 h-4" />
-            <span className="text-base font-bold font-mono tabular-nums">
+            <Clock className="w-3.5 h-3.5" />
+            <span className="text-xs font-bold font-mono tabular-nums">
               {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </div>
         </div>
 
-        {/* Date picker strip */}
-        <div className="flex items-center justify-between mt-2 bg-secondary/60 rounded-xl px-1 py-1">
-          <button onClick={() => shiftDate(-1)} className="p-1.5 rounded-lg hover:bg-secondary active:scale-90">
-            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-          </button>
-          <button
-            onClick={() => setSelectedDate(new Date())}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-              isToday ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-secondary'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            {formatDateLabel(new Date(selectedDate))}
-          </button>
-          <button onClick={() => shiftDate(1)} className="p-1.5 rounded-lg hover:bg-secondary active:scale-90">
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </button>
+        {/* Date Chips - horizontal scrollable week */}
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+          {dateChips.map(chip => (
+            <button
+              key={chip.key}
+              onClick={() => setSelectedDate(chip.date)}
+              className={`flex flex-col items-center min-w-[40px] px-2 py-1.5 rounded-xl text-center transition-all ${
+                chip.isSelected
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : chip.isToday
+                    ? 'bg-primary/15 text-primary'
+                    : 'bg-secondary/60 text-muted-foreground hover:bg-secondary'
+              }`}
+            >
+              <span className="text-[9px] font-medium uppercase leading-none">{chip.dayName}</span>
+              <span className="text-sm font-bold leading-tight">{chip.dayNum}</span>
+              <span className="text-[8px] leading-none opacity-70">{chip.month}</span>
+            </button>
+          ))}
+          {/* Manual date input */}
+          <div className="flex items-center ml-1">
+            <input
+              type="date"
+              value={selectedDate.toISOString().split('T')[0]}
+              onChange={e => {
+                const d = new Date(e.target.value + 'T00:00:00');
+                if (!isNaN(d.getTime())) setSelectedDate(d);
+              }}
+              className="bg-secondary/60 rounded-lg px-2 py-1.5 text-[10px] text-foreground w-[100px] h-[52px]"
+            />
+          </div>
         </div>
 
-        {/* Break + Queue controls */}
+        {/* Break + Walk-in controls */}
         <div className="flex items-center gap-2 mt-2">
           {isOnBreak ? (
             <button onClick={() => clearBreak(barberId)} className="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/30 px-3 py-1.5 rounded-full font-medium">

@@ -58,8 +58,8 @@ const App = () => (
           <FlutterBridge />
           <Suspense fallback={<FullPageSpinner />}>
             <Routes>
-              {/* ── Partner: Device Gate ── */}
-              <Route path="/partner" element={<DeviceGate />} />
+              {/* ── Partner: redirect /partner to /staff ── */}
+              <Route path="/partner" element={<StaffLayout />} />
 
               {/* ── Partner: Staff (single page with internal toggle) ── */}
               <Route path="/staff" element={<StaffLayout />} />
