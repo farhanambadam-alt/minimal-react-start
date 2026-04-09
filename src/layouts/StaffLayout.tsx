@@ -48,12 +48,6 @@ const StaffLayout = () => {
     }
   };
 
-  // Sync view with fake routing for the bottom nav highlight
-  const handleNavClick = (path: string) => {
-    if (path === '/staff') setView('schedule');
-    else if (path === '/staff/profile') setView('profile');
-  };
-
   return (
     <div className="relative flex flex-col h-full bg-background">
       {/* ── Header: Staff Switcher ── */}
@@ -97,7 +91,7 @@ const StaffLayout = () => {
 
       {/* ── Content ── */}
       <div className="flex-1 overflow-hidden">
-        {view === 'schedule' ? <StaffFloor /> : <StaffProfile />}
+        {isProfile ? <StaffProfile /> : <StaffFloor />}
       </div>
 
       {/* ── Floating Owner Button ── */}
