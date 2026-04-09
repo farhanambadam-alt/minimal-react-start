@@ -151,13 +151,7 @@ const StaffFloor = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStaff?.id]);
 
-  const shiftDate = useCallback((dir: -1 | 1) => {
-    setSelectedDate(prev => {
-      const d = new Date(prev);
-      d.setDate(d.getDate() + dir);
-      return d;
-    });
-  }, []);
+  // Generate date chips for ±3 days
 
   // Generate date chips for ±3 days
   const dateChips = useMemo(() => {
