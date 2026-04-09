@@ -159,9 +159,15 @@ const StaffFloor = () => {
     });
   }, []);
 
+  const barberId = activeStaff?.id ?? '';
+
+  const nextSlot = useMemo(() => {
+    if (!wiDrawerOpen || !barberId) return null;
+    return getNextAvailableSlot(barberId, manualDuration);
+  }, [wiDrawerOpen, barberId, manualDuration, getNextAvailableSlot]);
+
   if (!activeStaff) return null;
 
-  const barberId = activeStaff.id;
   const breakData = breaks[barberId];
   const nowMins = currentTime.getHours() * 60 + currentTime.getMinutes();
   const isOnBreak = breakData && nowMins < breakData.endMins && nowMins >= breakData.startMins;
@@ -171,7 +177,6 @@ const StaffFloor = () => {
   const dayBookings = staffAppointments.filter(a => a.date === selectedDateStr);
   const allBookings = [...dayBookings].sort((a, b) => timeToMins(a.scheduledTime) - timeToMins(b.scheduledTime));
 
-  // Timeline bounds
   const earliestStart = allBookings.reduce((min, b) => {
     const s = timeToMins(b.scheduledTime);
     return s < min ? s : min;
@@ -184,7 +189,6 @@ const StaffFloor = () => {
   const timelineStartMins = Math.min(OPEN_TIME, earliestStart);
   const timelineEndMins = Math.max(CLOSE_TIME, latestEnd + 30, isToday ? nowMins + 60 : CLOSE_TIME);
 
-  // Compute collision-free layout
   const layoutSlots = computeLayout(allBookings, timelineStartMins);
   const lastSlotBottom = layoutSlots.length > 0
     ? layoutSlots[layoutSlots.length - 1].visualTop + layoutSlots[layoutSlots.length - 1].visualHeight
@@ -194,11 +198,6 @@ const StaffFloor = () => {
   const totalHeight = Math.max(naturalHeight, lastSlotBottom + 40);
 
   const nowOffset = (nowMins - timelineStartMins) * PPM;
-
-  const nextSlot = useMemo(() => {
-    if (!wiDrawerOpen) return null;
-    return getNextAvailableSlot(barberId, manualDuration);
-  }, [wiDrawerOpen, barberId, manualDuration, getNextAvailableSlot]);
 
   const handleAddWalkIn = () => {
     const svcs = mockServices.filter(s => selectedServices.includes(s.id));
