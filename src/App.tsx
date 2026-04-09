@@ -60,8 +60,9 @@ const App = () => (
               {/* ── Partner: redirect /partner to /staff ── */}
               <Route path="/partner" element={<StaffLayout />} />
 
-              {/* ── Partner: Staff (single page with internal toggle) ── */}
+              {/* ── Partner: Staff ── */}
               <Route path="/staff" element={<StaffLayout />} />
+              <Route path="/staff/profile" element={<StaffLayout />} />
 
               {/* ── Partner: Owner Routes ── */}
               <Route path="/owner" element={<OwnerLayout />}>

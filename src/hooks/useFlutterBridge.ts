@@ -12,7 +12,11 @@ declare global {
   }
 }
 
-const TAB_ROUTES = new Set(['/', '/at-home', '/explore', '/bookings', '/profile']);
+const TAB_ROUTES = new Set([
+  '/', '/at-home', '/explore', '/bookings', '/profile',
+  '/staff', '/staff/profile',
+  '/owner', '/owner/bookings', '/owner/growth', '/owner/staff', '/owner/menu',
+]);
 
 /** Internal navigation stack — single source of truth for back navigation. */
 const routeStack: string[] = [window.location.pathname || '/'];
