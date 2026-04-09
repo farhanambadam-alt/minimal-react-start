@@ -286,26 +286,36 @@ const StaffFloor = () => {
         </div>
 
         {/* Date Chips - horizontal scrollable week */}
-        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
-          {dateChips.map(chip => (
-            <button
-              key={chip.key}
-              onClick={() => setSelectedDate(chip.date)}
-              className={`flex flex-col items-center min-w-[40px] px-2 py-1.5 rounded-xl text-center transition-all ${
-                chip.isSelected
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : chip.isToday
-                    ? 'bg-primary/15 text-primary'
-                    : 'bg-secondary/60 text-muted-foreground hover:bg-secondary'
-              }`}
-            >
-              <span className="text-[9px] font-medium uppercase leading-none">{chip.dayName}</span>
-              <span className="text-sm font-bold leading-tight">{chip.dayNum}</span>
-              <span className="text-[8px] leading-none opacity-70">{chip.month}</span>
-            </button>
-          ))}
+        <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
+          {dateChips.map(chip => {
+            const isSelectedAndToday = chip.isSelected && chip.isToday;
+            return (
+              <button
+                key={chip.key}
+                onClick={() => setSelectedDate(chip.date)}
+                className={`relative flex flex-col items-center min-w-[44px] px-2.5 py-1.5 rounded-2xl text-center transition-all shrink-0 ${
+                  isSelectedAndToday
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-2 ring-primary/30 ring-offset-1 ring-offset-card'
+                    : chip.isSelected
+                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                      : chip.isToday
+                        ? 'bg-primary/12 text-primary ring-1.5 ring-primary/40'
+                        : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
+                }`}
+              >
+                <span className="text-[9px] font-semibold uppercase leading-none tracking-wide">{chip.dayName}</span>
+                <span className="text-base font-bold leading-snug">{chip.dayNum}</span>
+                <span className="text-[8px] leading-none opacity-60">{chip.month}</span>
+                {chip.isToday && (
+                  <span className={`absolute -bottom-0.5 w-1.5 h-1.5 rounded-full ${
+                    chip.isSelected ? 'bg-primary-foreground' : 'bg-primary'
+                  }`} />
+                )}
+              </button>
+            );
+          })}
           {/* Manual date input */}
-          <div className="flex items-center ml-1">
+          <div className="flex items-center ml-1 shrink-0">
             <input
               type="date"
               value={selectedDate.toISOString().split('T')[0]}
@@ -313,7 +323,7 @@ const StaffFloor = () => {
                 const d = new Date(e.target.value + 'T00:00:00');
                 if (!isNaN(d.getTime())) setSelectedDate(d);
               }}
-              className="bg-secondary/60 rounded-lg px-2 py-1.5 text-[10px] text-foreground w-[100px] h-[52px]"
+              className="bg-secondary/50 rounded-xl px-2 py-1.5 text-[10px] text-foreground w-[100px] h-[50px] border border-border/50"
             />
           </div>
         </div>
