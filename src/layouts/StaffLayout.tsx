@@ -3,12 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { usePartner } from '@/contexts/PartnerContext';
 import StaffFloor from '@/pages/partner/StaffFloor';
 import StaffProfile from '@/pages/partner/StaffProfile';
+import PartnerBottomNav from '@/components/partner/PartnerBottomNav';
 import { CalendarDays, User, Crown, Lock } from 'lucide-react';
 import { OWNER_PIN } from '@/data/partnerMockData';
+import type { PartnerTab } from '@/components/partner/PartnerBottomNav';
 
 const STAFF_COLORS = [
   'bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500',
   'bg-rose-500', 'bg-cyan-500', 'bg-pink-500', 'bg-teal-500',
+];
+
+const staffTabs: PartnerTab[] = [
+  { icon: CalendarDays, label: 'Schedule', path: '/staff' },
+  { icon: User, label: 'Profile', path: '/staff/profile' },
 ];
 
 const StaffLayout = () => {
@@ -39,8 +46,14 @@ const StaffLayout = () => {
     }
   };
 
+  // Sync view with fake routing for the bottom nav highlight
+  const handleNavClick = (path: string) => {
+    if (path === '/staff') setView('schedule');
+    else if (path === '/staff/profile') setView('profile');
+  };
+
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="relative flex flex-col h-full bg-background">
       {/* ── Header: Staff Switcher ── */}
       <div className="bg-card border-b border-border px-3 pt-[max(var(--inset-top,0px),8px)] pb-2">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
@@ -88,37 +101,22 @@ const StaffLayout = () => {
       {/* ── Floating Owner Button ── */}
       <button
         onClick={handleOwnerAccess}
-        className="fixed bottom-20 right-4 z-40 w-12 h-12 rounded-full bg-amber-500 text-white shadow-lg shadow-amber-500/30 flex items-center justify-center active:scale-90 transition-transform"
+        className="absolute bottom-[88px] right-4 z-[51] w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+        style={{
+          background: 'linear-gradient(135deg, hsl(35, 92%, 58%) 0%, hsl(30, 85%, 50%) 100%)',
+          boxShadow: '0 4px 20px -2px hsla(35, 92%, 58%, 0.5), 0 2px 8px -1px hsla(35, 90%, 50%, 0.3)',
+        }}
         aria-label="Owner Dashboard"
       >
-        <Crown className="w-5 h-5" />
+        <Crown className="w-5 h-5 text-white" />
       </button>
 
-      {/* ── Bottom Nav ── */}
-      <nav className="flex items-center justify-around bg-card/95 backdrop-blur-md border-t border-border px-4 pb-[max(var(--inset-bottom),8px)] pt-2">
-        <button
-          onClick={() => setView('schedule')}
-          className={`flex flex-col items-center gap-0.5 px-6 py-1.5 rounded-xl transition-colors ${
-            view === 'schedule' ? 'text-primary' : 'text-muted-foreground'
-          }`}
-        >
-          <CalendarDays className={`w-5 h-5 ${view === 'schedule' ? 'stroke-[2.2]' : ''}`} />
-          <span className="text-[10px] font-medium">Schedule</span>
-        </button>
-        <button
-          onClick={() => setView('profile')}
-          className={`flex flex-col items-center gap-0.5 px-6 py-1.5 rounded-xl transition-colors ${
-            view === 'profile' ? 'text-primary' : 'text-muted-foreground'
-          }`}
-        >
-          <User className={`w-5 h-5 ${view === 'profile' ? 'stroke-[2.2]' : ''}`} />
-          <span className="text-[10px] font-medium">Profile</span>
-        </button>
-      </nav>
+      {/* ── Bottom Nav (same glassmorphic style as customer app) ── */}
+      <PartnerBottomNav tabs={staffTabs} />
 
       {/* ── Owner PIN Modal ── */}
       {pinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setPinModal(false)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setPinModal(false)}>
           <div className="bg-card rounded-2xl p-6 w-[280px] shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="flex flex-col items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/30 flex items-center justify-center">
