@@ -1,12 +1,8 @@
-import { useState } from 'react';
 import { usePartner } from '@/contexts/PartnerContext';
-import { mockFinancials, mockServices } from '@/data/partnerMockData';
-import { TrendingUp, Wallet, Clock, History, ChevronDown, ChevronUp } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-
+import { mockFinancials } from '@/data/partnerMockData';
+import { TrendingUp, Wallet, Clock } from 'lucide-react';
 const OwnerDashboard = () => {
-  const { staff, appointments, getStaffLogs } = usePartner();
-  const [expandedStaff, setExpandedStaff] = useState<string | null>(null);
+  const { staff, appointments } = usePartner();
   const fin = mockFinancials;
 
   const activeCount = staff.filter(s => s.status === 'busy').length;
@@ -76,63 +72,6 @@ const OwnerDashboard = () => {
         </div>
       </div>
 
-      {/* Per-staff logs - scrollable */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <History className="w-4 h-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">Staff Service Logs</h2>
-        </div>
-        <div className="flex flex-col gap-2">
-          {staff.map(s => {
-            const logs = getStaffLogs(s.id);
-            const isExpanded = expandedStaff === s.id;
-            const totalEarned = logs.reduce((sum, l) => sum + l.price, 0);
-            return (
-              <div key={s.id}>
-                <button
-                  onClick={() => setExpandedStaff(isExpanded ? null : s.id)}
-                  className="w-full flex items-center justify-between bg-card rounded-xl p-3 card-shadow"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{s.avatar}</span>
-                    <div className="text-left">
-                      <span className="text-sm font-medium text-foreground">{s.name}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground">{logs.length} completed</span>
-                        {logs.length > 0 && <span className="text-[10px] font-medium text-emerald-600">₹{totalEarned.toLocaleString('en-IN')}</span>}
-                      </div>
-                    </div>
-                  </div>
-                  {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-                </button>
-                {isExpanded && (
-                  <ScrollArea className="max-h-[200px] mt-1.5 ml-2">
-                    <div className="flex flex-col gap-1.5 pr-2">
-                      {logs.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-3 text-center bg-secondary rounded-lg">No completed services yet</p>
-                      ) : (
-                        logs.slice().reverse().map(log => {
-                          const serviceNames = log.serviceIds.map(sid => mockServices.find(sv => sv.id === sid)?.name).filter(Boolean);
-                          return (
-                            <div key={log.id} className="bg-secondary rounded-lg p-2.5">
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-foreground">{log.clientName}</p>
-                                <span className="text-[10px] font-semibold text-foreground">₹{log.price}</span>
-                              </div>
-                              <p className="text-[10px] text-muted-foreground">{serviceNames.join(', ')} · {log.duration}min</p>
-                              <p className="text-[10px] text-muted-foreground">{new Date(log.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </ScrollArea>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 };
