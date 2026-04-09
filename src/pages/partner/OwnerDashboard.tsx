@@ -1,12 +1,8 @@
-import { useState } from 'react';
 import { usePartner } from '@/contexts/PartnerContext';
-import { mockFinancials, mockServices } from '@/data/partnerMockData';
-import { TrendingUp, Wallet, Clock, History, ChevronDown, ChevronUp } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-
+import { mockFinancials } from '@/data/partnerMockData';
+import { TrendingUp, Wallet, Clock } from 'lucide-react';
 const OwnerDashboard = () => {
-  const { staff, appointments, getStaffLogs } = usePartner();
-  const [expandedStaff, setExpandedStaff] = useState<string | null>(null);
+  const { staff, appointments } = usePartner();
   const fin = mockFinancials;
 
   const activeCount = staff.filter(s => s.status === 'busy').length;
