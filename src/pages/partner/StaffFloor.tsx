@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { usePartner } from '@/contexts/PartnerContext';
 import {
   mockServices, minsToTime12, minsToTime, timeToMins,
   OPEN_TIME, CLOSE_TIME, PPM,
+  type Appointment,
 } from '@/data/partnerMockData';
 import ActionDrawer from '@/components/partner/ActionDrawer';
 import {
-  Plus, Clock, Smartphone, User, Coffee, Check, Minus, List,
-  AlertTriangle,
+  Plus, Clock, Smartphone, User, Coffee, Check, Minus,
+  AlertTriangle, X, ChevronLeft, ChevronRight, CalendarDays,
 } from 'lucide-react';
 
 /* ── Duration Dial ── */
@@ -65,17 +66,75 @@ const DurationDial = ({ value, onChange }: { value: number; onChange: (v: number
   );
 };
 
+/* ── Cancel Reasons ── */
+const CANCEL_REASONS = [
+  'Customer delayed',
+  'Customer cancelled',
+  'No-show',
+  'Staff unavailable',
+  'Other',
+] as const;
+
+/* ── Min card height so all elements are visible ── */
+const MIN_CARD_PX = 110;
+
+/* ── Date helpers ── */
+const formatDateLabel = (d: Date) => {
+  const today = new Date();
+  const diff = Math.round((d.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0)) / 86400000);
+  const base = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  if (diff === 0) return `Today · ${base}`;
+  if (diff === -1) return `Yesterday · ${base}`;
+  if (diff === 1) return `Tomorrow · ${base}`;
+  return base;
+};
+
+const isSameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+/* ── Collision-free layout: compute visual top/height avoiding overlaps ── */
+interface LayoutSlot {
+  id: string;
+  visualTop: number;
+  visualHeight: number;
+  booking: Appointment;
+}
+
+const computeLayout = (bookings: Appointment[], timelineStartMins: number): LayoutSlot[] => {
+  const sorted = [...bookings].sort((a, b) => timeToMins(a.scheduledTime) - timeToMins(b.scheduledTime));
+  const slots: LayoutSlot[] = [];
+  let maxBottom = 0;
+
+  for (const booking of sorted) {
+    const bStart = timeToMins(booking.scheduledTime);
+    const naturalTop = (bStart - timelineStartMins) * PPM;
+    const height = Math.max(booking.duration * PPM, MIN_CARD_PX);
+
+    // Push down if overlapping with previous card
+    const top = Math.max(naturalTop, maxBottom + 2);
+    slots.push({ id: booking.id, visualTop: top, visualHeight: height, booking });
+    maxBottom = top + height;
+  }
+  return slots;
+};
+
 /* ── Main Floor Component ── */
 const StaffFloor = () => {
   const {
     activeStaff, staffAppointments, completeService, startService,
     addWalkIn, breaks, setBreak, clearBreak, getNextAvailableSlot,
+    updateAppointmentStatus,
   } = usePartner();
+
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [wiDrawerOpen, setWiDrawerOpen] = useState(false);
   const [walkInName, setWalkInName] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [manualDuration, setManualDuration] = useState(30);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [cancelDrawerOpen, setCancelDrawerOpen] = useState(false);
+  const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,16 +151,27 @@ const StaffFloor = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStaff?.id]);
 
+  const shiftDate = useCallback((dir: -1 | 1) => {
+    setSelectedDate(prev => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() + dir);
+      return d;
+    });
+  }, []);
+
   if (!activeStaff) return null;
 
   const barberId = activeStaff.id;
   const breakData = breaks[barberId];
   const nowMins = currentTime.getHours() * 60 + currentTime.getMinutes();
   const isOnBreak = breakData && nowMins < breakData.endMins && nowMins >= breakData.startMins;
+  const isToday = isSameDay(selectedDate, new Date());
+  const selectedDateStr = selectedDate.toISOString().split('T')[0];
 
-  const allBookings = [...staffAppointments].sort((a, b) => timeToMins(a.scheduledTime) - timeToMins(b.scheduledTime));
+  const dayBookings = staffAppointments.filter(a => a.date === selectedDateStr);
+  const allBookings = [...dayBookings].sort((a, b) => timeToMins(a.scheduledTime) - timeToMins(b.scheduledTime));
 
-  // Find earliest and latest to define timeline bounds
+  // Timeline bounds
   const earliestStart = allBookings.reduce((min, b) => {
     const s = timeToMins(b.scheduledTime);
     return s < min ? s : min;
@@ -112,8 +182,16 @@ const StaffFloor = () => {
   }, CLOSE_TIME);
 
   const timelineStartMins = Math.min(OPEN_TIME, earliestStart);
-  const timelineEndMins = Math.max(CLOSE_TIME, latestEnd + 30, nowMins + 60);
-  const totalHeight = (timelineEndMins - timelineStartMins) * PPM;
+  const timelineEndMins = Math.max(CLOSE_TIME, latestEnd + 30, isToday ? nowMins + 60 : CLOSE_TIME);
+
+  // Compute collision-free layout
+  const layoutSlots = computeLayout(allBookings, timelineStartMins);
+  const lastSlotBottom = layoutSlots.length > 0
+    ? layoutSlots[layoutSlots.length - 1].visualTop + layoutSlots[layoutSlots.length - 1].visualHeight
+    : 0;
+
+  const naturalHeight = (timelineEndMins - timelineStartMins) * PPM;
+  const totalHeight = Math.max(naturalHeight, lastSlotBottom + 40);
 
   const nowOffset = (nowMins - timelineStartMins) * PPM;
 
@@ -132,12 +210,44 @@ const StaffFloor = () => {
     setManualDuration(30);
   };
 
+  const handleCancelRequest = (id: string) => {
+    setCancelTargetId(id);
+    setCancelDrawerOpen(true);
+  };
+
+  const handleCancelConfirm = (reason: string) => {
+    if (cancelTargetId) {
+      updateAppointmentStatus(cancelTargetId, 'cancelled');
+    }
+    setCancelDrawerOpen(false);
+    setCancelTargetId(null);
+  };
+
   const waitingQueue = allBookings.filter(a => a.status === 'waiting').sort((a, b) => a.queueNo - b.queueNo);
 
-  // Generate hour marks
+  // Hour marks
   const firstHour = Math.floor(timelineStartMins / 60);
   const lastHour = Math.ceil(timelineEndMins / 60);
   const hours = Array.from({ length: lastHour - firstHour + 1 }, (_, i) => (firstHour + i) * 60);
+
+  /* ── Node color helper ── */
+  const getNodeStyle = (status: Appointment['status']) => {
+    switch (status) {
+      case 'serving': return { bg: 'bg-blue-500', ring: 'ring-blue-200 dark:ring-blue-900' };
+      case 'completed': return { bg: 'bg-emerald-500', ring: 'ring-emerald-200 dark:ring-emerald-900' };
+      case 'cancelled': return { bg: 'bg-destructive', ring: 'ring-red-200 dark:ring-red-900' };
+      default: return { bg: 'bg-amber-400', ring: 'ring-amber-200 dark:ring-amber-900' };
+    }
+  };
+
+  const getTrackColor = (status: Appointment['status']) => {
+    switch (status) {
+      case 'completed': return 'bg-emerald-400/60';
+      case 'cancelled': return 'bg-destructive/40';
+      case 'serving': return 'bg-blue-400/60';
+      default: return 'bg-border/40';
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -164,6 +274,25 @@ const StaffFloor = () => {
               {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </div>
+        </div>
+
+        {/* Date picker strip */}
+        <div className="flex items-center justify-between mt-2 bg-secondary/60 rounded-xl px-1 py-1">
+          <button onClick={() => shiftDate(-1)} className="p-1.5 rounded-lg hover:bg-secondary active:scale-90">
+            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => setSelectedDate(new Date())}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+              isToday ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-secondary'
+            }`}
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            {formatDateLabel(new Date(selectedDate))}
+          </button>
+          <button onClick={() => shiftDate(1)} className="p-1.5 rounded-lg hover:bg-secondary active:scale-90">
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </button>
         </div>
 
         {/* Break + Queue controls */}
@@ -193,10 +322,19 @@ const StaffFloor = () => {
       {/* Timeline */}
       <div ref={timelineRef} className="flex-1 overflow-y-auto">
         <div className="relative ml-14 mr-4" style={{ height: `${totalHeight}px` }}>
-          {/* Continuous timeline track (vertical line from start to end) */}
+          {/* Default timeline track */}
           <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-border/40" />
 
-          {/* Salon hours shading (operational zone) */}
+          {/* Colored track segments per booking */}
+          {layoutSlots.map(slot => (
+            <div
+              key={`track-${slot.id}`}
+              className={`absolute left-0 w-0.5 ${getTrackColor(slot.booking.status)} transition-colors`}
+              style={{ top: `${slot.visualTop}px`, height: `${slot.visualHeight}px` }}
+            />
+          ))}
+
+          {/* Before hours shading */}
           {timelineStartMins < OPEN_TIME && (
             <div
               className="absolute left-0 right-0 bg-amber-500/5"
@@ -219,7 +357,6 @@ const StaffFloor = () => {
                     {minsToTime12(hourMins).replace(':00 ', ' ')}
                   </span>
                 </div>
-                {/* 30-min dash */}
                 {hourMins + 30 < timelineEndMins && (
                   <div className="absolute left-0 right-0 border-t border-dashed border-border/30" style={{ top: `${top + 30 * PPM}px` }}>
                     <span className="absolute -left-14 -top-2.5 text-[9px] text-muted-foreground/50 w-12 text-right">
@@ -231,7 +368,7 @@ const StaffFloor = () => {
             );
           })}
 
-          {/* Overtime zone shading */}
+          {/* Overtime zone */}
           {timelineEndMins > CLOSE_TIME && (
             <div
               className="absolute left-0 right-0 bg-amber-500/8 border-t-2 border-amber-500/40"
@@ -258,108 +395,145 @@ const StaffFloor = () => {
             </div>
           )}
 
-          {/* Booking cards */}
-          {allBookings.map(booking => {
+          {/* ── Booking cards (collision-free) ── */}
+          {layoutSlots.map(slot => {
+            const booking = slot.booking;
             const bStart = timeToMins(booking.scheduledTime);
             const bEnd = bStart + booking.duration;
-            const top = (bStart - timelineStartMins) * PPM;
-            const height = booking.duration * PPM;
             const isOvertime = bEnd > CLOSE_TIME;
             const isOvertimeStart = bStart >= CLOSE_TIME;
             const isBeforeOpen = bStart < OPEN_TIME;
+            const isSmall = slot.visualHeight <= MIN_CARD_PX + 10;
+            const isExpanded = expandedCardId === booking.id;
 
             const serviceNames = booking.serviceIds
               .map(sid => mockServices.find(s => s.id === sid)?.name)
               .filter(Boolean);
 
             const bookingOvertime = booking.status === 'serving' && nowMins > bEnd;
+            const nodeStyle = getNodeStyle(booking.status);
 
             const borderColor = booking.status === 'completed'
               ? 'border-l-emerald-400'
-              : booking.type === 'online'
-                ? 'border-l-blue-500'
-                : 'border-l-green-500';
+              : booking.status === 'cancelled'
+                ? 'border-l-destructive'
+                : booking.type === 'online'
+                  ? 'border-l-blue-500'
+                  : 'border-l-green-500';
 
             const bgColor = booking.status === 'completed'
               ? 'bg-muted/50'
-              : isOvertimeStart || isBeforeOpen
-                ? 'bg-amber-50 dark:bg-amber-950/20'
-                : 'bg-card';
+              : booking.status === 'cancelled'
+                ? 'bg-destructive/5'
+                : isOvertimeStart || isBeforeOpen
+                  ? 'bg-amber-50 dark:bg-amber-950/20'
+                  : 'bg-card';
+
+            const cardHeight = isExpanded ? 'auto' : `${slot.visualHeight}px`;
 
             return (
-              <div
-                key={booking.id}
-                className={`absolute left-1 right-0 ${bgColor} rounded-xl border border-border border-l-4 ${borderColor} shadow-sm overflow-hidden`}
-                style={{ top: `${top}px`, height: `${Math.max(height, 70)}px` }}
-              >
-                <div className="p-2.5 h-full flex flex-col">
-                  {/* Tags */}
-                  <div className="flex flex-wrap gap-1 mb-1">
-                    <span className="text-[9px] font-bold bg-foreground/10 text-foreground px-1.5 py-0.5 rounded-full">#{booking.queueNo}</span>
-                    <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${
-                      booking.type === 'online' ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400' : 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-400'
-                    }`}>
-                      {booking.type === 'online' ? <Smartphone className="w-2.5 h-2.5" /> : <User className="w-2.5 h-2.5" />}
-                      {booking.type === 'online' ? 'Online' : 'Walk-in'}
-                    </span>
+              <div key={booking.id} className="absolute left-0 right-0" style={{ top: `${slot.visualTop}px`, zIndex: isExpanded ? 30 : 10 }}>
+                {/* Timeline node */}
+                <div className="absolute left-0 top-3 -translate-x-1/2 z-10">
+                  <div className={`w-4 h-4 rounded-full ${nodeStyle.bg} ring-2 ${nodeStyle.ring} flex items-center justify-center`}>
+                    {booking.status === 'completed' && <Check className="w-2.5 h-2.5 text-white" />}
+                    {booking.status === 'cancelled' && <X className="w-2.5 h-2.5 text-white" />}
+                    {booking.status === 'serving' && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                  </div>
+                </div>
+
+                {/* Card */}
+                <div
+                  onClick={() => isSmall && setExpandedCardId(isExpanded ? null : booking.id)}
+                  className={`ml-4 ${bgColor} rounded-xl border border-border border-l-4 ${borderColor} shadow-sm transition-all duration-200 ${
+                    isSmall ? 'cursor-pointer' : ''
+                  } ${isExpanded ? 'shadow-lg ring-1 ring-primary/20' : 'overflow-hidden'}`}
+                  style={{ height: isExpanded ? 'auto' : cardHeight, minHeight: isExpanded ? 'auto' : undefined }}
+                >
+                  <div className={`p-2 h-full flex flex-col ${isExpanded ? '' : 'overflow-hidden'}`}>
+                    {/* Row 1: Tags - compact for small cards */}
+                    <div className="flex flex-wrap items-center gap-0.5 mb-0.5">
+                      <span className="text-[8px] font-bold bg-foreground/10 text-foreground px-1 py-px rounded-full leading-none">#{booking.queueNo}</span>
+                      <span className={`text-[8px] font-medium px-1 py-px rounded-full flex items-center gap-px leading-none ${
+                        booking.type === 'online' ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400' : 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-400'
+                      }`}>
+                        {booking.type === 'online' ? <Smartphone className="w-2 h-2" /> : <User className="w-2 h-2" />}
+                        {booking.type === 'online' ? 'Online' : 'Walk-in'}
+                      </span>
+                      {booking.status === 'serving' && (
+                        <span className="text-[8px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 px-1 py-px rounded-full animate-pulse leading-none">Serving</span>
+                      )}
+                      {booking.status === 'waiting' && (
+                        <span className="text-[8px] font-medium bg-secondary text-muted-foreground px-1 py-px rounded-full leading-none">Waiting</span>
+                      )}
+                      {booking.status === 'completed' && (
+                        <span className="text-[8px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-1 py-px rounded-full flex items-center gap-0.5 leading-none">
+                          <Check className="w-2 h-2" /> Finished
+                        </span>
+                      )}
+                      {booking.status === 'cancelled' && (
+                        <span className="text-[8px] font-bold bg-destructive/15 text-destructive px-1 py-px rounded-full flex items-center gap-0.5 leading-none">
+                          <X className="w-2 h-2" /> Cancelled
+                        </span>
+                      )}
+                      {bookingOvertime && (
+                        <span className="text-[8px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-1 py-px rounded-full flex items-center gap-0.5 leading-none">
+                          <AlertTriangle className="w-2 h-2" /> OT
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Row 2: Name + time inline for compact layout */}
+                    <div className="flex items-center justify-between gap-1">
+                      <p className={`text-xs font-bold truncate ${booking.status === 'completed' ? 'text-muted-foreground line-through' : booking.status === 'cancelled' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                        {booking.clientName}
+                      </p>
+                      <span className="text-[9px] text-muted-foreground whitespace-nowrap flex-shrink-0">
+                        {minsToTime12(bStart)}–{minsToTime12(bEnd)} · ₹{booking.price}
+                      </span>
+                    </div>
+
+                    {/* Row 3: Services */}
+                    <div className="flex flex-wrap gap-0.5 mt-0.5">
+                      {(isExpanded ? serviceNames : serviceNames.slice(0, 2)).map((name, i) => (
+                        <span key={i} className="text-[9px] text-muted-foreground bg-secondary px-1 py-px rounded leading-none">{name}</span>
+                      ))}
+                      {!isExpanded && serviceNames.length > 2 && (
+                        <span className="text-[9px] text-primary font-semibold px-1 py-px leading-none">+{serviceNames.length - 2}</span>
+                      )}
+                    </div>
+
+                    {/* Action buttons - always visible */}
                     {booking.status === 'serving' && (
-                      <span className="text-[9px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-full animate-pulse">Serving</span>
+                      <button onClick={(e) => { e.stopPropagation(); completeService(booking.id); }} className="mt-1 w-full flex items-center justify-center gap-1 bg-emerald-600 text-white py-1.5 rounded-lg text-[10px] font-bold active:scale-95 transition-transform">
+                        <Check className="w-3 h-3" /> COMPLETE
+                      </button>
                     )}
                     {booking.status === 'waiting' && (
-                      <span className="text-[9px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded-full">Waiting</span>
-                    )}
-                    {booking.status === 'completed' && (
-                      <span className="text-[9px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                        <Check className="w-2.5 h-2.5" /> Done
-                      </span>
-                    )}
-                    {bookingOvertime && (
-                      <span className="text-[9px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                        <AlertTriangle className="w-2.5 h-2.5" /> Overtime
-                      </span>
-                    )}
-                    {(isOvertime || isBeforeOpen) && booking.status !== 'completed' && !bookingOvertime && (
-                      <span className="text-[9px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 px-1.5 py-0.5 rounded-full">OT</span>
+                      <div className="flex gap-1 mt-1">
+                        <button onClick={(e) => { e.stopPropagation(); startService(booking.id); }} className="flex-1 flex items-center justify-center gap-1 bg-foreground text-background py-1.5 rounded-lg text-[10px] font-bold active:scale-95 transition-transform">
+                          START
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); handleCancelRequest(booking.id); }} className="flex items-center justify-center px-2 py-1.5 rounded-lg bg-destructive/10 text-destructive active:scale-95 transition-transform">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
                     )}
                   </div>
-
-                  <p className={`text-sm font-bold ${booking.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>{booking.clientName}</p>
-                  <div className="flex flex-wrap gap-1 mt-0.5">
-                    {serviceNames.map((name, i) => (
-                      <span key={i} className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">{name}</span>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2 mt-auto text-[10px] text-muted-foreground">
-                    <span>{minsToTime12(bStart)} – {minsToTime12(bEnd)}</span>
-                    <span>{booking.duration}min</span>
-                    <span className="font-semibold">₹{booking.price}</span>
-                  </div>
-
-                  {booking.status === 'serving' && (
-                    <button onClick={() => completeService(booking.id)} className="mt-1.5 w-full flex items-center justify-center gap-1.5 bg-emerald-600 text-white py-2 rounded-lg text-xs font-bold active:scale-95 transition-transform">
-                      <Check className="w-3.5 h-3.5" /> COMPLETE
-                    </button>
-                  )}
-                  {booking.status === 'waiting' && (
-                    <button onClick={() => startService(booking.id)} className="mt-1.5 w-full flex items-center justify-center gap-1.5 bg-foreground text-background py-2 rounded-lg text-xs font-bold active:scale-95 transition-transform">
-                      START
-                    </button>
-                  )}
                 </div>
               </div>
             );
           })}
 
-          {/* Current time indicator (red line with pulsing dot) */}
-          {nowMins >= timelineStartMins && nowMins <= timelineEndMins && (
+          {/* NOW indicator */}
+          {isToday && nowMins >= timelineStartMins && nowMins <= timelineEndMins && (
             <div className="absolute left-0 right-0 z-20 flex items-center pointer-events-none" style={{ top: `${nowOffset}px` }}>
               <div className="relative -ml-1.5">
                 <div className="w-3 h-3 rounded-full bg-destructive animate-pulse" />
                 <div className="absolute inset-0 w-3 h-3 rounded-full bg-destructive/40 animate-ping" />
               </div>
               <div className="flex-1 h-[2px] bg-destructive" />
-              <span className="text-[9px] font-bold text-destructive ml-1 bg-background px-1 rounded">NOW</span>
+              <span className="text-[9px] font-bold text-destructive ml-1 bg-background px-1.5 py-0.5 rounded-full shadow-sm border border-destructive/20">NOW</span>
             </div>
           )}
         </div>
@@ -431,6 +605,21 @@ const StaffFloor = () => {
         <button onClick={handleAddWalkIn} disabled={nextSlot === null} className="w-full mt-4 bg-emerald-600 text-white py-3.5 rounded-xl font-bold text-sm active:scale-95 transition-transform disabled:opacity-30 flex items-center justify-center gap-2">
           <Plus className="w-4 h-4" /> ADD TO QUEUE
         </button>
+      </ActionDrawer>
+
+      {/* Cancel Reason Drawer */}
+      <ActionDrawer open={cancelDrawerOpen} onClose={() => setCancelDrawerOpen(false)} title="Cancel Appointment" description="Select a reason for cancellation">
+        <div className="flex flex-col gap-2">
+          {CANCEL_REASONS.map(reason => (
+            <button
+              key={reason}
+              onClick={() => handleCancelConfirm(reason)}
+              className="w-full text-left px-4 py-3 rounded-xl bg-secondary hover:bg-destructive/10 text-sm font-medium text-foreground transition-colors active:scale-[0.98]"
+            >
+              {reason}
+            </button>
+          ))}
+        </div>
       </ActionDrawer>
     </div>
   );
